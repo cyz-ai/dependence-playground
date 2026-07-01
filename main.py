@@ -13,6 +13,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.feature_selection import mutual_info_regression
 
+from measures import distance_correlation, rbf_cka
+
 
 def estimate_mi(x, y, n_neighbors=5):
     """Estimate MI(X; Y) using KSG (k-nearest neighbors) via sklearn."""
@@ -23,13 +25,18 @@ def estimate_mi(x, y, n_neighbors=5):
 
 def myplot(ax, xy, xlim=(-4, 4), ylim=(-4, 4), eps=1e-15):
     x, y = xy[:, 0], xy[:, 1]
-    rho = np.corrcoef(x, y)[0, 1] if np.std(y) > eps else np.nan
-    mi = estimate_mi(x, y) if np.std(y) > eps else 0.0
-    # Title: rho on top, MI below
-    rho_str = f"ρ={rho:.2f}" if not np.isnan(rho) else ""
-    mi_str = f"MI={mi:.2f}"
+    valid = np.std(y) > eps
+    rho = np.corrcoef(x, y)[0, 1] if valid else np.nan
+    mi = estimate_mi(x, y) if valid else 0.0
+    # dependence measures ported from latent_compress (rho~0 but these > 0 for
+    # nonlinear dependence -> "correlation is not dependence")
+    dcor = distance_correlation(x, y) if valid else 0.0
+    cka = rbf_cka(x, y) if valid else 0.0
+    # Title: rho + MI on top, distance-correlation + RBF-CKA below
+    rho_str = f"ρ={rho:.2f}" if not np.isnan(rho) else "ρ=—"
     ax.scatter(x, y, c="darkblue", s=0.5, edgecolors="none")
-    ax.set_title(f"{rho_str}\n{mi_str}", fontsize=8, linespacing=1.2)
+    ax.set_title(f"{rho_str}  MI={mi:.2f}\ndCor={dcor:.2f}  CKA={cka:.2f}",
+                 fontsize=7, linespacing=1.2)
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
     ax.set_xticks([])
@@ -104,8 +111,8 @@ def others(axes, n=800):
 
 
 def main(save_path=None):
-    fig, axes = plt.subplots(3, 7, figsize=(9, 4.5))
-    fig.subplots_adjust(wspace=0.15, hspace=0.6)
+    fig, axes = plt.subplots(3, 7, figsize=(13, 5))
+    fig.subplots_adjust(wspace=0.4, hspace=0.7)
 
     np.random.seed(42)
     mv_normal(axes[0])
